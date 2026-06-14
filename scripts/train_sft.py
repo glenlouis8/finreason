@@ -84,7 +84,6 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=tokenizer,
-        max_seq_length=cfg["model"]["max_seq_length"],
     )
 
     print("Starting SFT training...")
