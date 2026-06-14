@@ -122,6 +122,51 @@ def build_preference_pairs(
     return pairs
 
 
+def build_synthetic_preference_pairs(examples: list[dict], seed: int = 42) -> list[dict]:
+    import random
+    rng = random.Random(seed)
+
+    corrupt_factors = [1.5, 2.0, -1.0, 0.5, 3.0, 0.1, 10.0]
+
+    pairs = []
+    for ex in examples:
+        correct_answer = extract_numeric_answer(ex.get("answer", ""))
+        if correct_answer is None:
+            continue
+
+        chosen_text = ex["messages"][2]["content"]
+
+        factor = rng.choice(corrupt_factors)
+        wrong_answer = correct_answer * factor
+        if abs(wrong_answer - correct_answer) < 1e-6:
+            wrong_answer = correct_answer + 100.0
+
+        if abs(wrong_answer) < 1e-9:
+            wrong_answer = 999.0
+
+        wrong_str = f"{wrong_answer:.4f}".rstrip("0").rstrip(".")
+        rejected_text = re.sub(
+            r"Final Answer:\s*[-+]?\d[\d,]*\.?\d*%?",
+            f"Final Answer: {wrong_str}",
+            chosen_text,
+        )
+
+        if rejected_text == chosen_text:
+            continue
+
+        user_content = ex["messages"][1]["content"]
+        pairs.append({
+            "prompt": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            "chosen": [{"role": "assistant", "content": chosen_text}],
+            "rejected": [{"role": "assistant", "content": rejected_text}],
+        })
+
+    return pairs
+
+
 def save_jsonl(data: list[dict], path: str):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:

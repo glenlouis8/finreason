@@ -14,9 +14,11 @@ import argparse
 import yaml
 from pathlib import Path
 
-from src.data_utils import load_finqa_sft, save_jsonl
+from src.data_utils import (
+    load_finqa_sft, save_jsonl, load_jsonl, SYSTEM_PROMPT,
+    build_preference_pairs, build_synthetic_preference_pairs,
+)
 from src.model_utils import load_model_for_inference, generate_batch
-from src.data_utils import build_preference_pairs, load_jsonl, SYSTEM_PROMPT
 
 
 def parse_args():
@@ -27,6 +29,7 @@ def parse_args():
     parser.add_argument("--n_runs", type=int, default=3, help="Runs per question for DPO pair mining")
     parser.add_argument("--max_examples", type=int, default=2000, help="Max train examples to use for DPO pairs")
     parser.add_argument("--batch_size", type=int, default=8, help="Generation batch size")
+    parser.add_argument("--synthetic", action="store_true", help="Build DPO pairs from ground truth (no model inference)")
     return parser.parse_args()
 
 
@@ -42,6 +45,14 @@ def prepare_sft(cfg: dict):
     save_jsonl(test, "data/sft_test.jsonl")
 
     print(f"SFT data saved — train: {len(train)}, eval: {len(eval_)}, test: {len(test)}")
+
+
+def prepare_dpo_synthetic(cfg: dict, max_examples: int = 2000):
+    train_examples = load_jsonl("data/sft_train.jsonl")[:max_examples]
+    print(f"Building synthetic DPO pairs from {len(train_examples)} examples...")
+    pairs = build_synthetic_preference_pairs(train_examples, seed=cfg["training"]["seed"])
+    save_jsonl(pairs, "data/dpo_pairs.jsonl")
+    print(f"Synthetic DPO pairs saved — {len(pairs)} pairs")
 
 
 def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000, batch_size: int = 8, checkpoint_every: int = 500):
@@ -120,9 +131,12 @@ def main():
     prepare_sft(cfg)
 
     if args.dpo:
-        with open(args.dpo_config) as f:
-            dpo_cfg = yaml.safe_load(f)
-        prepare_dpo(cfg, dpo_cfg, args.n_runs, args.max_examples, args.batch_size)
+        if args.synthetic:
+            prepare_dpo_synthetic(cfg, args.max_examples)
+        else:
+            with open(args.dpo_config) as f:
+                dpo_cfg = yaml.safe_load(f)
+            prepare_dpo(cfg, dpo_cfg, args.n_runs, args.max_examples, args.batch_size)
 
 
 if __name__ == "__main__":
