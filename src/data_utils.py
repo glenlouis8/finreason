@@ -1,7 +1,7 @@
 import json
 import re
+import urllib.request
 from pathlib import Path
-from datasets import load_dataset
 
 
 SYSTEM_PROMPT = (
@@ -18,11 +18,16 @@ def format_table(table: list[list[str]]) -> str:
 
 
 def format_sft_example(example: dict) -> dict:
-    table_str = format_table(example.get("table", []))
-    question = example["question"]
-    answer = example["answer"]
+    qa = example["qa"]
+    question = qa["question"]
+    answer = str(qa["answer"])
 
-    steps = example.get("steps", [])
+    table_str = format_table(example.get("table_ori", []))
+    pre_text = " ".join(example.get("pre_text", []))
+    post_text = " ".join(example.get("post_text", []))
+    context = f"{pre_text}\n\n{post_text}".strip()
+
+    steps = qa.get("steps", [])
     if steps:
         reasoning = "\n".join(
             f"Step {i+1}: {s.get('arg1', '')} {s.get('op', '')} {s.get('arg2', '')} = {s.get('res', '')}"
@@ -32,7 +37,7 @@ def format_sft_example(example: dict) -> dict:
     else:
         full_answer = f"Final Answer: {answer}"
 
-    user_content = f"Table:\n{table_str}\n\nQuestion: {question}"
+    user_content = f"Context:\n{context}\n\nTable:\n{table_str}\n\nQuestion: {question}"
 
     return {
         "messages": [
@@ -44,18 +49,31 @@ def format_sft_example(example: dict) -> dict:
     }
 
 
+FINQA_URLS = {
+    "train": "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/train.json",
+    "test":  "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/test.json",
+}
+
+
+def _download_finqa(split: str) -> list[dict]:
+    url = FINQA_URLS[split]
+    print(f"Downloading FinQA {split} from {url}...")
+    with urllib.request.urlopen(url) as r:
+        return json.loads(r.read().decode())
+
+
 def load_finqa_sft(eval_split_ratio: float = 0.05, seed: int = 42):
-    dataset = load_dataset("dreamerdeo/finqa", trust_remote_code=True)
-    train_raw = dataset["train"]
-    test_raw = dataset["test"]
+    import random
+
+    train_raw = _download_finqa("train")
+    test_raw = _download_finqa("test")
 
     train_formatted = [format_sft_example(ex) for ex in train_raw]
     test_formatted = [format_sft_example(ex) for ex in test_raw]
 
-    split = int(len(train_formatted) * (1 - eval_split_ratio))
-    import random
     random.seed(seed)
     random.shuffle(train_formatted)
+    split = int(len(train_formatted) * (1 - eval_split_ratio))
 
     return train_formatted[:split], train_formatted[split:], test_formatted
 
@@ -77,7 +95,7 @@ def build_preference_pairs(
 ) -> list[dict]:
     pairs = []
     for ex, output in zip(examples, model_outputs):
-        correct_answer = extract_numeric_answer(str(ex["answer"]))
+        correct_answer = extract_numeric_answer(str(ex.get("answer", ex.get("qa", {}).get("answer", ""))))
         chosen_text = None
         rejected_text = None
 
