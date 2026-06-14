@@ -15,7 +15,7 @@ import yaml
 from pathlib import Path
 
 from src.data_utils import load_finqa_sft, save_jsonl
-from src.model_utils import load_model_for_inference, generate
+from src.model_utils import load_model_for_inference, generate_batch
 from src.data_utils import build_preference_pairs, load_jsonl, SYSTEM_PROMPT
 
 
@@ -24,7 +24,9 @@ def parse_args():
     parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument("--dpo", action="store_true", help="Generate DPO preference pairs")
     parser.add_argument("--dpo_config", default="configs/dpo.yaml")
-    parser.add_argument("--n_runs", type=int, default=5, help="Runs per question for DPO pair mining")
+    parser.add_argument("--n_runs", type=int, default=3, help="Runs per question for DPO pair mining")
+    parser.add_argument("--max_examples", type=int, default=2000, help="Max train examples to use for DPO pairs")
+    parser.add_argument("--batch_size", type=int, default=8, help="Generation batch size")
     return parser.parse_args()
 
 
@@ -42,7 +44,7 @@ def prepare_sft(cfg: dict):
     print(f"SFT data saved — train: {len(train)}, eval: {len(eval_)}, test: {len(test)}")
 
 
-def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, checkpoint_every: int = 500):
+def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000, batch_size: int = 8, checkpoint_every: int = 500):
     import json
 
     sft_checkpoint = dpo_cfg["training"]["sft_checkpoint"]
@@ -65,9 +67,9 @@ def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, checkpoint_every: int = 5
         cfg["model"]["name"], sft_checkpoint, cfg
     )
 
-    train_examples = load_jsonl("data/sft_train.jsonl")
+    train_examples = load_jsonl("data/sft_train.jsonl")[:max_examples]
     remaining = train_examples[start_idx:]
-    print(f"Generating {n_runs} runs per question for {len(remaining)} remaining examples...")
+    print(f"Generating {n_runs} runs per question for {len(remaining)} remaining examples (batch_size={batch_size})...")
 
     batch_outputs = []
     batch_examples = []
@@ -80,12 +82,13 @@ def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, checkpoint_every: int = 5
         messages = ex["messages"][:-1]
         prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
-        runs = []
-        for _ in range(n_runs):
-            text = generate(model, tokenizer, prompt, max_new_tokens=512)
-            runs.append({"text": text})
+        prompts_for_runs = [prompt] * n_runs
+        texts = []
+        for b in range(0, n_runs, batch_size):
+            batch = prompts_for_runs[b:b + batch_size]
+            texts.extend(generate_batch(model, tokenizer, batch, max_new_tokens=256))
 
-        batch_outputs.append({"runs": runs})
+        batch_outputs.append({"runs": [{"text": t} for t in texts]})
         batch_examples.append(ex)
 
         if (i + 1) % checkpoint_every == 0:
@@ -119,7 +122,7 @@ def main():
     if args.dpo:
         with open(args.dpo_config) as f:
             dpo_cfg = yaml.safe_load(f)
-        prepare_dpo(cfg, dpo_cfg, args.n_runs)
+        prepare_dpo(cfg, dpo_cfg, args.n_runs, args.max_examples, args.batch_size)
 
 
 if __name__ == "__main__":

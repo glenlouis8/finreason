@@ -72,7 +72,7 @@ def load_base_only(model_name: str, cfg: dict):
     return model, tokenizer
 
 
-def generate(model, tokenizer, prompt: str, max_new_tokens: int = 512) -> str:
+def generate(model, tokenizer, prompt: str, max_new_tokens: int = 256) -> str:
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
         output = model.generate(
@@ -84,3 +84,18 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int = 512) -> str:
         )
     decoded = tokenizer.decode(output[0], skip_special_tokens=True)
     return decoded[len(tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)):]
+
+
+def generate_batch(model, tokenizer, prompts: list[str], max_new_tokens: int = 256) -> list[str]:
+    tokenizer.padding_side = "left"
+    inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True, max_length=1024).to(model.device)
+    input_lengths = inputs["input_ids"].shape[1]
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+    tokenizer.padding_side = "right"
+    return [tokenizer.decode(out[input_lengths:], skip_special_tokens=True) for out in outputs]
