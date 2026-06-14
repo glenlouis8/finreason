@@ -1,9 +1,13 @@
 [project]
 name = "finreason"
 version = "0.1.0"
-description = "Add your description here"
+description = "Financial Reasoning LLM: SFT + DPO alignment pipeline on FinQA"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
 dependencies = [
     "accelerate>=0.28.0",
     "bitsandbytes>=0.43.0",
