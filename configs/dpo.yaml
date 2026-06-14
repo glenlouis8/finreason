@@ -39,6 +39,7 @@ training:
   save_strategy: epoch
   seed: 42
   beta: 0.1
+  gradient_checkpointing: false
 
 data:
   pairs_path: data/dpo_pairs.jsonl

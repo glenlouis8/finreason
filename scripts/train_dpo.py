@@ -45,6 +45,7 @@ def main():
 
     print(f"Loading SFT model from {sft_checkpoint}...")
     model, tokenizer = load_model_for_inference(model_name, sft_checkpoint, sft_cfg)
+    model.enable_input_require_grads()
     model.train()
 
     pairs_raw = load_jsonl(cfg["data"]["pairs_path"])
@@ -71,6 +72,7 @@ def main():
         save_strategy=t["save_strategy"],
         seed=t["seed"],
         beta=t["beta"],
+        gradient_checkpointing=t.get("gradient_checkpointing", False),
         report_to="wandb",
     )
 
