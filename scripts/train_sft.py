@@ -74,7 +74,6 @@ def main():
         logging_steps=t["logging_steps"],
         save_strategy=t["save_strategy"],
         seed=t["seed"],
-        max_seq_length=cfg["model"]["max_seq_length"],
         dataset_text_field="text",
         report_to="wandb",
     )
@@ -85,6 +84,7 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processing_class=tokenizer,
+        max_seq_length=cfg["model"]["max_seq_length"],
     )
 
     print("Starting SFT training...")
