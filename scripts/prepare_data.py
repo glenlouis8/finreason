@@ -42,10 +42,23 @@ def prepare_sft(cfg: dict):
     print(f"SFT data saved — train: {len(train)}, eval: {len(eval_)}, test: {len(test)}")
 
 
-def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int):
+def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, checkpoint_every: int = 500):
+    import json
+
     sft_checkpoint = dpo_cfg["training"]["sft_checkpoint"]
     if not Path(sft_checkpoint).exists():
         raise FileNotFoundError(f"SFT checkpoint not found at {sft_checkpoint}. Run train_sft.py first.")
+
+    pairs_path = Path("data/dpo_pairs.jsonl")
+    progress_path = Path("data/dpo_progress.json")
+
+    start_idx = 0
+    existing_pairs = []
+    if progress_path.exists() and pairs_path.exists():
+        progress = json.loads(progress_path.read_text())
+        start_idx = progress["completed"]
+        existing_pairs = load_jsonl(str(pairs_path))
+        print(f"Resuming from example {start_idx} ({len(existing_pairs)} pairs so far)")
 
     print(f"Loading SFT model from {sft_checkpoint}...")
     model, tokenizer = load_model_for_inference(
@@ -53,12 +66,16 @@ def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int):
     )
 
     train_examples = load_jsonl("data/sft_train.jsonl")
-    print(f"Generating {n_runs} runs per question for {len(train_examples)} examples...")
+    remaining = train_examples[start_idx:]
+    print(f"Generating {n_runs} runs per question for {len(remaining)} remaining examples...")
 
-    model_outputs = []
-    for i, ex in enumerate(train_examples):
+    batch_outputs = []
+    batch_examples = []
+
+    for i, ex in enumerate(remaining):
+        global_i = start_idx + i
         if i % 100 == 0:
-            print(f"  {i}/{len(train_examples)}")
+            print(f"  {global_i}/{len(train_examples)}")
 
         messages = ex["messages"][:-1]
         prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -68,11 +85,25 @@ def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int):
             text = generate(model, tokenizer, prompt, max_new_tokens=512)
             runs.append({"text": text})
 
-        model_outputs.append({"runs": runs})
+        batch_outputs.append({"runs": runs})
+        batch_examples.append(ex)
 
-    pairs = build_preference_pairs(train_examples, model_outputs)
-    save_jsonl(pairs, "data/dpo_pairs.jsonl")
-    print(f"DPO pairs saved — {len(pairs)} pairs from {len(train_examples)} examples")
+        if (i + 1) % checkpoint_every == 0:
+            new_pairs = build_preference_pairs(batch_examples, batch_outputs)
+            existing_pairs.extend(new_pairs)
+            save_jsonl(existing_pairs, str(pairs_path))
+            progress_path.write_text(json.dumps({"completed": global_i + 1}))
+            print(f"  Checkpoint saved — {global_i + 1} done, {len(existing_pairs)} pairs total")
+            batch_outputs = []
+            batch_examples = []
+
+    if batch_examples:
+        new_pairs = build_preference_pairs(batch_examples, batch_outputs)
+        existing_pairs.extend(new_pairs)
+
+    save_jsonl(existing_pairs, str(pairs_path))
+    progress_path.write_text(json.dumps({"completed": len(train_examples)}))
+    print(f"DPO pairs saved — {len(existing_pairs)} pairs from {len(train_examples)} examples")
 
 
 def main():
