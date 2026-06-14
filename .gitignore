@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+*.pt
+*.bin
+*.safetensors
+checkpoints/
+outputs/
+wandb/
+.DS_Store
+*.log
+data/
+CLAUDE.md

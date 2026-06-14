@@ -1,0 +1,48 @@
+model:
+  name: Qwen/Qwen2.5-7B-Instruct
+  max_seq_length: 2048
+
+qlora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: none
+  task_type: CAUSAL_LM
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+training:
+  sft_checkpoint: checkpoints/sft
+  output_dir: checkpoints/dpo
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 5.0e-5
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.1
+  optim: paged_adamw_8bit
+  bf16: true
+  fp16: false
+  logging_steps: 10
+  save_strategy: epoch
+  seed: 42
+  beta: 0.1
+
+data:
+  pairs_path: data/dpo_pairs.jsonl
+
+wandb:
+  project: finreason
+  run_name: dpo-qwen2.5-7b

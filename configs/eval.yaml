@@ -1,0 +1,18 @@
+model:
+  base: Qwen/Qwen2.5-7B-Instruct
+  sft_checkpoint: checkpoints/sft
+  dpo_checkpoint: checkpoints/dpo
+  max_new_tokens: 512
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+eval:
+  test_path: data/sft_eval.jsonl
+  results_dir: results/
+  numeric_tolerance: 0.01
+  batch_size: 8
+  seed: 42
