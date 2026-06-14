@@ -6,6 +6,10 @@ Usage:
     python scripts/evaluate.py --config configs/eval.yaml
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import argparse
 import yaml
 from tqdm import tqdm

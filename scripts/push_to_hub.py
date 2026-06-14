@@ -5,6 +5,10 @@ Usage:
     python scripts/push_to_hub.py --repo your-username/finreason-qwen2.5-7b-dpo
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import argparse
 import json
 import yaml
