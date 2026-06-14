@@ -130,8 +130,10 @@ def build_synthetic_preference_pairs(examples: list[dict], seed: int = 42) -> li
 
     pairs = []
     for ex in examples:
-        correct_answer = extract_numeric_answer(ex.get("answer", ""))
-        if correct_answer is None:
+        raw = str(ex.get("answer", "")).replace("%", "").replace(",", "").strip()
+        try:
+            correct_answer = float(raw)
+        except ValueError:
             continue
 
         chosen_text = ex["messages"][2]["content"]
@@ -146,8 +148,8 @@ def build_synthetic_preference_pairs(examples: list[dict], seed: int = 42) -> li
 
         wrong_str = f"{wrong_answer:.4f}".rstrip("0").rstrip(".")
         rejected_text = re.sub(
-            r"Final Answer:\s*[-+]?\d[\d,]*\.?\d*%?",
-            f"Final Answer: {wrong_str}",
+            r"(Final Answer:\s*)[-+]?[\d,]*\.?\d+%?",
+            rf"\g<1>{wrong_str}",
             chosen_text,
         )
 
