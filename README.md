@@ -86,6 +86,43 @@ python scripts/evaluate.py --config configs/eval.yaml
 
 ---
 
+## Production Deployment (AWS SageMaker)
+
+Training jobs and endpoint deployment scripts are included for production use.
+
+**Launch SFT training job on SageMaker:**
+```bash
+python scripts/train_sagemaker.py --stage sft \
+    --bucket my-s3-bucket \
+    --role arn:aws:iam::123456789:role/SageMakerRole
+```
+
+**Launch DPO training job:**
+```bash
+python scripts/train_sagemaker.py --stage dpo \
+    --bucket my-s3-bucket \
+    --role arn:aws:iam::123456789:role/SageMakerRole
+```
+
+**Deploy model to endpoint (`ml.g5.2xlarge`):**
+```bash
+python scripts/deploy_sagemaker.py \
+    --role arn:aws:iam::123456789:role/SageMakerRole \
+    --deploy
+```
+
+**Run inference against live endpoint:**
+```bash
+python scripts/deploy_sagemaker.py --endpoint finreason-dpo --predict
+```
+
+**Delete endpoint (stop billing):**
+```bash
+python scripts/deploy_sagemaker.py --endpoint finreason-dpo --delete
+```
+
+---
+
 ## Inference
 
 ```python
