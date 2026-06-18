@@ -1,0 +1,16 @@
+I fine-tuned a 7B LLM to do math over SEC filings. No labeled data, no team, just me and a Colab notebook.
+
+The base model answered 0.3% of FinQA questions correctly. After fine-tuning: 56.5%.
+
+FinQA is brutal — questions like "what was the 3-year CAGR of operating income" where you need to read a table, do multi-step arithmetic, and get the exact number. The base model just hallucinates. The fine-tuned one actually reasons through it step by step.
+
+Built the full pipeline myself:
+- QLoRA SFT on Qwen2.5-7B (4-bit, runs on a single A100)
+- DPO alignment using automatically mined preference pairs
+- W&B experiment tracking
+- Published to HuggingFace, SageMaker deployment scripts ready
+
+Model → https://huggingface.co/glen-louis/finreason-qwen2.5-7b-dpo
+Code → https://github.com/glenlouis8/finreason
+
+#MachineLearning #LLM #FineTuning #GenerativeAI

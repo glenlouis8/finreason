@@ -86,16 +86,23 @@ def generate(model, tokenizer, prompt: str, max_new_tokens: int = 256) -> str:
     return decoded[len(tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)):]
 
 
-def generate_batch(model, tokenizer, prompts: list[str], max_new_tokens: int = 256) -> list[str]:
+def generate_batch(
+    model,
+    tokenizer,
+    prompts: list[str],
+    max_new_tokens: int = 256,
+    do_sample: bool = False,
+    temperature: float = 0.8,
+    top_p: float = 0.95,
+) -> list[str]:
     tokenizer.padding_side = "left"
     inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True, max_length=1024).to(model.device)
     input_lengths = inputs["input_ids"].shape[1]
+    gen_kwargs = dict(max_new_tokens=max_new_tokens, do_sample=do_sample, pad_token_id=tokenizer.eos_token_id)
+    if do_sample:
+        # Sampling needed for DPO pair mining: runs must diverge to yield correct+wrong chains.
+        gen_kwargs.update(temperature=temperature, top_p=top_p)
     with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            pad_token_id=tokenizer.eos_token_id,
-        )
+        outputs = model.generate(**inputs, **gen_kwargs)
     tokenizer.padding_side = "right"
     return [tokenizer.decode(out[input_lengths:], skip_special_tokens=True) for out in outputs]

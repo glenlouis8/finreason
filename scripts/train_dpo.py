@@ -50,6 +50,15 @@ def main():
 
     pairs_raw = load_jsonl(cfg["data"]["pairs_path"])
 
+    MIN_PAIRS = 200
+    if len(pairs_raw) < MIN_PAIRS:
+        raise ValueError(
+            f"Only {len(pairs_raw)} preference pairs in {cfg['data']['pairs_path']} "
+            f"(need >= {MIN_PAIRS}). Too few pairs => DPO no-ops (update falls below bf16 "
+            f"precision, adapter stays identical to SFT). Re-mine with "
+            f"`prepare_data.py --dpo` (sampled real pairs), not --synthetic."
+        )
+
     dataset = Dataset.from_dict({
         "prompt":   [ex["prompt"] for ex in pairs_raw],
         "chosen":   [ex["chosen"] for ex in pairs_raw],

@@ -97,7 +97,7 @@ def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000,
         texts = []
         for b in range(0, n_runs, batch_size):
             batch = prompts_for_runs[b:b + batch_size]
-            texts.extend(generate_batch(model, tokenizer, batch, max_new_tokens=256))
+            texts.extend(generate_batch(model, tokenizer, batch, max_new_tokens=256, do_sample=True))
 
         batch_outputs.append({"runs": [{"text": t} for t in texts]})
         batch_examples.append(ex)
