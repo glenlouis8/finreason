@@ -82,6 +82,7 @@ def main():
         seed=t["seed"],
         beta=t["beta"],
         gradient_checkpointing=t.get("gradient_checkpointing", False),
+        precompute_ref_log_probs=t.get("precompute_ref_log_probs", True),
         report_to="wandb",
     )
 
