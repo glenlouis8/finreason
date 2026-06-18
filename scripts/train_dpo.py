@@ -43,10 +43,13 @@ def main():
     sft_checkpoint = cfg["training"]["sft_checkpoint"]
     model_name = sft_cfg["model"]["name"]
 
-    print(f"Loading SFT model from {sft_checkpoint}...")
+    print(f"Loading SFT model (policy) from {sft_checkpoint}...")
     model, tokenizer = load_model_for_inference(model_name, sft_checkpoint, sft_cfg)
     model.enable_input_require_grads()
     model.train()
+
+    print(f"Loading SFT model (reference, frozen) from {sft_checkpoint}...")
+    ref_model, _ = load_model_for_inference(model_name, sft_checkpoint, sft_cfg)
 
     pairs_raw = load_jsonl(cfg["data"]["pairs_path"])
 
@@ -82,13 +85,12 @@ def main():
         seed=t["seed"],
         beta=t["beta"],
         gradient_checkpointing=t.get("gradient_checkpointing", False),
-        precompute_ref_log_probs=t.get("precompute_ref_log_probs", True),
         report_to="wandb",
     )
 
     trainer = DPOTrainer(
         model=model,
-        ref_model=None,
+        ref_model=ref_model,
         args=dpo_config,
         train_dataset=dataset,
         processing_class=tokenizer,
