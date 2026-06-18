@@ -93,9 +93,11 @@ def build_preference_pairs(
     examples: list[dict],
     model_outputs: list[dict],
 ) -> list[dict]:
-    # chosen = ground-truth reasoning (always available); rejected = any wrong
-    # sampled run. Only ONE wrong run needed per question — the SFT model aces
-    # its own train data, so a correct run is rare but a wrong one suffices.
+    # chosen = ground-truth reasoning (always good); rejected = any NOT-correct
+    # sampled run. The SFT model aces its own train data, so on the rare miss it
+    # usually also drops the "Final Answer:" format -> unparseable. Treat both
+    # numerically-wrong AND malformed runs as rejected: either is a worse output
+    # than the ground-truth chain, which is all DPO needs.
     pairs = []
     for ex, output in zip(examples, model_outputs):
         correct_answer = extract_numeric_answer(str(ex.get("answer", ex.get("qa", {}).get("answer", ""))))
@@ -103,12 +105,18 @@ def build_preference_pairs(
         rejected_text = None
 
         for run in output["runs"]:
-            predicted = extract_numeric_answer(run["text"])
-            if correct_answer is not None and predicted is not None:
-                is_correct = abs(predicted - correct_answer) / (abs(correct_answer) + 1e-9) < 0.01
-                if not is_correct:
-                    rejected_text = run["text"]
-                    break
+            run_text = run["text"].strip()
+            if not run_text or run_text == chosen_text.strip():
+                continue
+            predicted = extract_numeric_answer(run_text)
+            is_correct = (
+                correct_answer is not None
+                and predicted is not None
+                and abs(predicted - correct_answer) / (abs(correct_answer) + 1e-9) < 0.01
+            )
+            if not is_correct:
+                rejected_text = run["text"]
+                break
 
         if chosen_text and rejected_text:
             user_content = ex["messages"][1]["content"]

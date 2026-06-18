@@ -55,7 +55,7 @@ def prepare_dpo_synthetic(cfg: dict, max_examples: int = 2000):
     print(f"Synthetic DPO pairs saved — {len(pairs)} pairs")
 
 
-def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000, batch_size: int = 8, checkpoint_every: int = 500):
+def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000, batch_size: int = 8, checkpoint_every: int = 100):
     import json
 
     sft_checkpoint = dpo_cfg["training"]["sft_checkpoint"]
