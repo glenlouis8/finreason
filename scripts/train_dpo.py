@@ -45,8 +45,13 @@ def main():
 
     print(f"Loading SFT model (policy) from {sft_checkpoint}...")
     model, tokenizer = load_model_for_inference(model_name, sft_checkpoint, sft_cfg)
+    for name, param in model.named_parameters():
+        if "lora_" in name:
+            param.requires_grad_(True)
     model.enable_input_require_grads()
     model.train()
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Trainable parameters: {trainable:,}")
 
     print(f"Loading SFT model (reference, frozen) from {sft_checkpoint}...")
     ref_model, _ = load_model_for_inference(model_name, sft_checkpoint, sft_cfg)
