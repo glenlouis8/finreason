@@ -26,10 +26,10 @@ quantization:
 training:
   sft_checkpoint: checkpoints/sft
   output_dir: checkpoints/dpo
-  num_train_epochs: 1
+  num_train_epochs: 2
   per_device_train_batch_size: 1
   gradient_accumulation_steps: 16
-  learning_rate: 1.0e-6
+  learning_rate: 1.0e-5
   lr_scheduler_type: cosine
   warmup_ratio: 0.1
   optim: paged_adamw_8bit
