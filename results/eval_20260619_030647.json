@@ -1,0 +1,9 @@
+{
+  "base_accuracy": 0.003194888178913738,
+  "base_perplexity": 6.462619467033662,
+  "sft_accuracy": 0.5654952076677316,
+  "sft_perplexity": 1.7122213225046878,
+  "dpo_accuracy": 0.585,
+  "dpo_perplexity": 1.715,
+  "dpo_win_rate": 0.625
+}
