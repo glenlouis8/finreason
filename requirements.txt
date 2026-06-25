@@ -9,6 +9,5 @@ wandb>=0.16.0
 scipy>=1.12.0
 numpy>=1.26.0
 pandas>=2.2.0
-sagemaker>=2.210.0
 huggingface_hub>=0.22.0
 PyYAML>=6.0.1

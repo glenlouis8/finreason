@@ -92,7 +92,7 @@ print(tokenizer.decode(output[0], skip_special_tokens=True))
 - **SFT:** QLoRA NF4 4-bit, r=16 alpha=32, 3 epochs, lr=2e-4
 - **DPO:** beta=0.1, 1 epoch, lr=5e-5
 - **Preference pairs:** mined from SFT model outputs (correct vs wrong chain-of-thought)
-- **Infrastructure:** AWS SageMaker ml.g5.2xlarge
+- **Infrastructure:** Google Colab Pro A100 (40GB)
 - **Experiment tracking:** Weights & Biases
 """
 

@@ -8,7 +8,7 @@ Built the full pipeline myself:
 - QLoRA SFT on Qwen2.5-7B (4-bit, runs on a single A100)
 - DPO alignment using automatically mined preference pairs
 - W&B experiment tracking
-- Published to HuggingFace, SageMaker deployment scripts ready
+- Published to HuggingFace + Kubernetes serving layer (vLLM, AWQ, HPA, Grafana)
 
 Model → https://huggingface.co/glen-louis/finreason-qwen2.5-7b-dpo
 Code → https://github.com/glenlouis8/finreason
