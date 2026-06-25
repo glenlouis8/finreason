@@ -12,12 +12,12 @@ Portfolio project targeting ML Engineer roles.
 | Stage | Accuracy | Perplexity |
 |-------|----------|------------|
 | Base (Qwen2.5-7B-Instruct) | 0.3% | 6.46 |
-| SFT (QLoRA fine-tuned) | **56.5%** | **1.71** |
-| DPO (aligned) | 56.5% | 1.71 |
+| SFT (QLoRA fine-tuned) | 56.5% | **1.71** |
+| DPO (aligned) | **58.5%** | 1.72 |
 
 - **Perplexity drop:** 6.46 → 1.71 (base → SFT)
-- **Accuracy gain:** 0.3% → 56.5% (+56.2pp)
-- **DPO win rate vs SFT:** 0.500 (neutral — SFT already learned correct reasoning patterns)
+- **Accuracy gain:** 0.3% → 58.5% (+58.2pp, base → DPO)
+- **DPO win rate vs SFT:** 0.625 (DPO preferred on 62.5% of contested pairs)
 
 Eval on FinQA test set (313 examples, seed=42). Numeric tolerance ±1%.
 
@@ -84,6 +84,20 @@ python scripts/train_dpo.py --config configs/dpo.yaml
 # Eval
 python scripts/evaluate.py --config configs/eval.yaml
 ```
+
+---
+
+## Serving (Kubernetes)
+
+Production serving layer in [`serving/`](serving/README.md): vLLM inference,
+AWQ 4-bit quantization, Docker, Kubernetes (Deployment + Service + HPA
+autoscaling), Locust load testing, Prometheus/Grafana.
+
+Proof (`serving/docs/screenshots/`): a real LLM running on Kubernetes —
+pod + Service + OpenAI-compatible API answering a FinReason question through
+the cluster. Load test: 326 req/s, p99 14ms, 0% errors @ 100 users.
+7B FinReason model AWQ-quantized and published:
+[glen-louis/finreason-qwen2.5-7b-awq](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-awq).
 
 ---
 
