@@ -1,0 +1,65 @@
+# Real-model Deployment — vLLM serving the AWQ FinReason model.
+# This is the nginx training-wheels Deployment, swapped to the real thing.
+# Needs a GPU node (cloud K8s, or RunPod + k3s). On the CPU kind cluster
+# this won't schedule — that's expected; the YAML is the deliverable.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finreason-vllm
+  labels:
+    app: finreason-vllm
+spec:
+  replicas: 1                       # 1 per GPU; scale = more GPU nodes
+  selector:
+    matchLabels:
+      app: finreason-vllm
+  template:
+    metadata:
+      labels:
+        app: finreason-vllm
+    spec:
+      containers:
+        - name: vllm
+          image: glen-louis/finreason-vllm:latest   # the Dockerfile image
+          args:
+            - --model=glen-louis/finreason-qwen2.5-7b-awq
+            - --quantization=awq
+            - --max-model-len=4096
+            - --gpu-memory-utilization=0.90
+            - --port=8000
+          ports:
+            - containerPort: 8000
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:        # HF token from a Secret, never in image
+                  name: hf-token
+                  key: token
+          resources:
+            limits:
+              nvidia.com/gpu: 1      # request 1 GPU (needs GPU node + device plugin)
+          readinessProbe:            # 7B AWQ takes ~30-60s to load
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30     # allow generous startup time
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 90
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finreason-vllm
+spec:
+  type: ClusterIP
+  selector:
+    app: finreason-vllm
+  ports:
+    - port: 8000
+      targetPort: 8000

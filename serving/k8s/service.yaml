@@ -1,0 +1,17 @@
+# ─────────────────────────────────────────────────────────────
+# SERVICE — concept 14. One stable address in front of the pods.
+# Pods come and go (new IPs each time). This gives ONE fixed door,
+# and load-balances requests across whichever pods are alive.
+# ─────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: finreason-web        # the Service's name = the stable DNS name inside cluster
+spec:
+  type: ClusterIP            # reachable only INSIDE the cluster (we reach it via port-forward)
+  selector:
+    app: finreason-web       # route to pods with THIS label (matches the Deployment)
+  ports:
+    - port: 8080             # the port the Service listens on
+      targetPort: 80         # the port on the POD it forwards to (nginx's 80)
+      protocol: TCP

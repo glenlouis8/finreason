@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────
+# DEPLOYMENT — concept 13. "Always keep N pods of this image alive."
+# Training-wheels version: runs nginx (a tiny web server) instead of
+# a model, so you learn K8s mechanics with zero GPU/model noise.
+# Later we swap `image:` for a real model server — same file shape.
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1          # which K8s API group/version this object uses
+kind: Deployment             # the TYPE of object (concept 13)
+metadata:
+  name: finreason-web        # name of THIS deployment
+  labels:
+    app: finreason-web       # a tag; the Service uses it to find these pods
+spec:
+  replicas: 2                # KEEP 2 PODS ALIVE. Kill one -> K8s remakes it.
+  selector:
+    matchLabels:
+      app: finreason-web     # "this deployment manages pods labeled app=finreason-web"
+  template:                  # ── the blueprint for each pod (concept 12) ──
+    metadata:
+      labels:
+        app: finreason-web   # every pod gets this label (must match selector above)
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.27-alpine   # the image each pod runs (tiny nginx)
+          ports:
+            - containerPort: 80       # nginx serves HTTP on port 80 inside the pod
+          # ── RESOURCES (concept: requests/limits) ──
+          resources:
+            requests:                 # what the pod is GUARANTEED
+              cpu: "50m"              # 50 millicpu = 0.05 of a core
+              memory: "64Mi"
+            limits:                   # the CEILING it can't exceed
+              cpu: "200m"
+              memory: "128Mi"
+          # ── PROBES (concept 16) ──
+          readinessProbe:             # "ready for traffic yet?" — gates the Service
+            httpGet:
+              path: /                 # nginx returns 200 on / when ready
+              port: 80
+            initialDelaySeconds: 2    # wait 2s before first check
+            periodSeconds: 5          # then check every 5s
+          livenessProbe:              # "still alive, or stuck?" — restarts if dead
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10

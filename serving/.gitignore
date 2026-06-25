@@ -1,0 +1,17 @@
+# local junk
+.DS_Store
+*.log
+
+# python (later phases)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# secrets — NEVER commit
+*.secret.yaml
+.env
+
+# model weights / big files
+*.safetensors
+*.bin

@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────
+# HPA — concept 19. Horizontal Pod Autoscaler.
+# Watches pod CPU (via metrics-server, concept 20) and changes the
+# pod count automatically: busy -> add pods, quiet -> remove them.
+# ─────────────────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: finreason-web
+spec:
+  scaleTargetRef:              # WHAT to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: finreason-web        # our nginx deployment
+  minReplicas: 2               # never below 2
+  maxReplicas: 8               # never above 8 (cost cap)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50   # if avg pod CPU > 50% of its request
+                                   # (request = 50m, so 50% = 25m), add pods
