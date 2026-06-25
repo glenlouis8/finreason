@@ -49,7 +49,7 @@ push_to_hub.py    → publish to HuggingFace with model card
 - **Training:** TRL SFTTrainer + DPOTrainer, paged_adamw_8bit, cosine LR
 - **Tracking:** Weights & Biases
 - **Compute:** Google Colab Pro A100 (40GB)
-- **Serving:** HuggingFace Hub
+- **Serving:** HuggingFace Hub + production K8s layer (see [`serving/`](serving/README.md))
 
 ---
 
@@ -61,6 +61,7 @@ src/        # data_utils, model_utils, eval_utils
 scripts/    # one entry point per pipeline stage
 results/    # versioned eval JSON
 notebooks/  # colab_sft.ipynb, colab_dpo.ipynb
+serving/    # production serving: vLLM, AWQ, Docker, K8s, HPA, load test, Grafana
 ```
 
 ---
