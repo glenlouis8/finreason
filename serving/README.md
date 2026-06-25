@@ -4,18 +4,26 @@ Production serving layer for the fine-tuned FinReason model
 (`glen-louis/finreason-qwen2.5-7b-dpo`): vLLM inference, Docker, Kubernetes,
 autoscaling, load testing, and Prometheus/Grafana monitoring.
 
-Training repo (SFT + DPO): separate — this repo only serves the published model.
+This is the `serving/` layer of the FinReason repo. The training (SFT + DPO)
+code lives at the repo root; this folder only serves the published model.
 
 ## Status
 - [x] Phase 0 — local kind cluster (`kubectl get nodes` Ready)
-- [ ] Phase 4 — Deployment + Service on K8s (in progress, training-wheels nginx)
-- [ ] Phase 1-3 — vLLM + AWQ + Docker (needs GPU; Colab/RunPod)
-- [ ] Phase 5 — HPA autoscaling
-- [ ] Phase 6 — load test + benchmarks
-- [ ] Phase 7 — Prometheus + Grafana
+- [x] Phase 4 — Deployment + Service on K8s + self-healing (training-wheels nginx)
+- [x] Phase 5 — HPA autoscaling (2→8 pods, 50% CPU, both directions)
+- [x] Phase 6 — load test: 326 req/s, p99 14ms, 0% errors @ 100 users
+- [x] Phase 7 — Prometheus + Grafana dashboard
+- [ ] Phase 1-3 — vLLM + AWQ + Docker (kit in `model/`; needs a GPU run — RunPod)
 - [ ] Phase 8 — online eval harness
 
-## Cluster
+## Run on a GPU box (RunPod)
+```bash
+git clone https://github.com/glenlouis8/finreason.git
+cd finreason/serving/model
+# then follow model/README.md  (merge → AWQ → serve → test → eval)
+```
+
+## Local K8s cluster (Mac, $0)
 ```bash
 kind create cluster --name finreason
 kubectl get nodes            # -> Ready
