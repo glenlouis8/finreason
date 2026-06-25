@@ -1,7 +1,7 @@
-# Real-model Deployment — vLLM serving the AWQ FinReason model.
-# This is the nginx training-wheels Deployment, swapped to the real thing.
-# Needs a GPU node (cloud K8s, or RunPod + k3s). On the CPU kind cluster
-# this won't schedule — that's expected; the YAML is the deliverable.
+# Real-model Deployment — vLLM serving the AWQ FinReason model on K8s.
+# Uses vLLM's PUBLIC image (no custom build needed). Model is public on the
+# Hub, so no HF token required. Needs a GPU node + NVIDIA device plugin
+# (see RUNBOOK-k3s.md). On the CPU kind cluster this won't schedule — expected.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,7 +9,7 @@ metadata:
   labels:
     app: finreason-vllm
 spec:
-  replicas: 1                       # 1 per GPU; scale = more GPU nodes
+  replicas: 1
   selector:
     matchLabels:
       app: finreason-vllm
@@ -20,36 +20,32 @@ spec:
     spec:
       containers:
         - name: vllm
-          image: glen-louis/finreason-vllm:latest   # the Dockerfile image
-          args:
-            - --model=glen-louis/finreason-qwen2.5-7b-awq
+          image: vllm/vllm-openai:latest
+          command:                       # explicit = unambiguous across image versions
+            - vllm
+            - serve
+            - glen-louis/finreason-qwen2.5-7b-awq
             - --quantization=awq
             - --max-model-len=4096
             - --gpu-memory-utilization=0.90
             - --port=8000
           ports:
             - containerPort: 8000
-          env:
-            - name: HF_TOKEN
-              valueFrom:
-                secretKeyRef:        # HF token from a Secret, never in image
-                  name: hf-token
-                  key: token
           resources:
             limits:
-              nvidia.com/gpu: 1      # request 1 GPU (needs GPU node + device plugin)
-          readinessProbe:            # 7B AWQ takes ~30-60s to load
+              nvidia.com/gpu: 1          # 1 GPU (needs device plugin on the node)
+          readinessProbe:                # 7B AWQ takes ~30-60s to load
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 30     # allow generous startup time
+            failureThreshold: 30
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 90
+            initialDelaySeconds: 120
             periodSeconds: 15
 ---
 apiVersion: v1
