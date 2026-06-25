@@ -1,0 +1,56 @@
+# Real-LLM Deployment for the Mac (CPU) kind cluster.
+# Ollama serves a small Qwen2.5 model on CPU — no GPU needed — so a genuine
+# LLM runs on Kubernetes here. Ollama exposes an OpenAI-compatible API on 11434.
+# Model is pulled into the pod after start (see RUNBOOK), not baked into the image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finreason-llm
+  labels:
+    app: finreason-llm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finreason-llm
+  template:
+    metadata:
+      labels:
+        app: finreason-llm
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          readinessProbe:        # is Ollama's API up?
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 15
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finreason-llm
+spec:
+  type: ClusterIP
+  selector:
+    app: finreason-llm
+  ports:
+    - port: 11434
+      targetPort: 11434
