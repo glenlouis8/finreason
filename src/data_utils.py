@@ -82,15 +82,49 @@ def load_finqa_sft(seed: int = 42):
     return train_formatted, dev_formatted, test_formatted
 
 
-def extract_numeric_answer(text: str) -> float | None:
-    matches = re.findall(r"Final Answer:\s*([-+]?\d*\.?\d+%?)", text)
-    if not matches:
-        return None
-    val = matches[-1].replace("%", "").replace(",", "").strip()
+# Matches 1234 / 1,234.5 / -12 / $1,234 / (1,234) / 14.1% — financial text is messy.
+_NUM = r"\(?\s*[-+]?\s*\$?\s*\d[\d,]*\.?\d*\s*\)?\s*%?"
+
+
+def _to_float(raw: str) -> float | None:
+    s = raw.strip()
+    negative = s.startswith("(") and s.endswith(")")   # accounting notation for negatives
+    s = s.strip("()").replace("$", "").replace("%", "").replace(",", "").replace(" ", "")
     try:
-        return float(val)
+        val = float(s)
     except ValueError:
         return None
+    return -val if negative else val
+
+
+def extract_numeric_answer(text: str, fallback: bool = True) -> float | None:
+    """Pull the predicted number out of a model response.
+
+    Tries the trained format first, then degrades. The fallback exists so the BASE
+    model gets a fair score: it was never told to emit a "Final Answer:" line, so a
+    strict-only parser scores it near 0% for formatting, not for reasoning — which
+    inflates the base->SFT gain into a meaningless number.
+
+    Pass fallback=False when you specifically want to measure format compliance.
+    """
+    matches = re.findall(rf"Final Answer:\s*({_NUM})", text)
+    if matches:
+        return _to_float(matches[-1])
+
+    if not fallback:
+        return None
+
+    # "the answer is 1,234" / "answer: 1234" — common base-model phrasing
+    matches = re.findall(rf"answers?\s*(?:is|:|=)\s*({_NUM})", text, flags=re.IGNORECASE)
+    if matches:
+        return _to_float(matches[-1])
+
+    # Last resort: last number in the response. Reasoning chains end on their result.
+    matches = re.findall(_NUM, text)
+    if matches:
+        return _to_float(matches[-1])
+
+    return None
 
 
 def build_preference_pairs(
@@ -98,10 +132,13 @@ def build_preference_pairs(
     model_outputs: list[dict],
 ) -> list[dict]:
     # chosen = ground-truth reasoning (always good); rejected = any NOT-correct
-    # sampled run. The SFT model aces its own train data, so on the rare miss it
-    # usually also drops the "Final Answer:" format -> unparseable. Treat both
-    # numerically-wrong AND malformed runs as rejected: either is a worse output
-    # than the ground-truth chain, which is all DPO needs.
+    # sampled run. Numerically-wrong and malformed runs both count as rejected —
+    # either is worse than the ground-truth chain, which is all DPO needs.
+    #
+    # NOTE: ex["answer"] is a bare string ("127.40"), no "Final Answer:" prefix.
+    # extract_numeric_answer's fallback path is what parses it. Without the fallback
+    # this returned None, is_correct was permanently False, and every run got
+    # rejected regardless of correctness — the pairs carried no signal.
     pairs = []
     for ex, output in zip(examples, model_outputs):
         correct_answer = extract_numeric_answer(str(ex.get("answer", ex.get("qa", {}).get("answer", ""))))
