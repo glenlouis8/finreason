@@ -9,22 +9,25 @@ Portfolio project targeting ML Engineer roles.
 
 ## Results
 
-| Stage | Accuracy | Perplexity |
-|-------|----------|------------|
-| Base (Qwen2.5-7B-Instruct) | 0.3% | 6.46 |
-| SFT (QLoRA fine-tuned) | 56.5% | **1.71** |
-| DPO (aligned) | **58.5%** | 1.72 |
+Official FinQA test set, 1,147 examples. Numeric exact match, ±1% relative tolerance.
 
-- **Perplexity drop:** 6.46 → 1.71 (base → SFT)
-- **Accuracy gain:** 0.3% → 58.5% (+58.2pp, base → DPO)
-- **DPO win rate vs SFT:** 0.625 (DPO preferred on 62.5% of contested pairs)
+| Stage | Accuracy | Correct | Perplexity |
+|-------|----------|---------|------------|
+| Base (Qwen2.5-7B-Instruct, zero-shot) | 52.2% | 599/1147 | 6.60 |
+| SFT (QLoRA fine-tuned) | 58.0% | 665/1147 | **2.87** |
+| DPO (aligned) | **59.2%** | 679/1147 | 2.89 |
 
-> **Stale — rerun pending.** These numbers came from a run that held out 5% of FinQA train
-> (313 examples) as its eval set; the official `dev`/`test` files were never used. The pipeline
-> now trains on all 6,251 train rows, validates on dev (883), and reports on test (1,147).
-> Table gets replaced once SFT is retrained and `evaluate.py` reruns on test.
+- **Perplexity drop:** 6.60 → 2.87 (base → SFT)
+- **Accuracy gain:** +5.8pp from SFT, +1.2pp from DPO
+- **DPO win rate vs SFT:** 0.630 — but on only 27 contested examples (17/27),
+  so the DPO delta is **not statistically significant** (exact binomial p = 0.25,
+  95% CI [0.42, 0.81]). DPO did not hurt; the evidence isn't strong enough to
+  claim it helped.
 
-Numeric tolerance ±1%, seed=42.
+Reference point: FinQANet (the FinQA paper's retriever-generator baseline) reports 61.24%
+execution accuracy on the same test set.
+
+Raw numbers in [`results/eval_20260805_210727.json`](results/eval_20260805_210727.json).
 
 ---
 
