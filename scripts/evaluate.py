@@ -14,7 +14,7 @@ import argparse
 import yaml
 from tqdm import tqdm
 
-from src.model_utils import load_base_only, load_model_for_inference, generate
+from src.model_utils import load_base_only, load_model_for_inference, generate_batch
 from src.data_utils import load_jsonl
 from src.eval_utils import compute_accuracy, compute_perplexity, compute_win_rate, save_results
 
@@ -25,13 +25,20 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_predictions(model, tokenizer, examples: list[dict], max_new_tokens: int) -> list[str]:
+def run_predictions(
+    model, tokenizer, examples: list[dict], max_new_tokens: int,
+    batch_size: int = 8, max_prompt_length: int = 2048,
+) -> list[str]:
+    prompts = [
+        tokenizer.apply_chat_template(ex["messages"][:-1], tokenize=False, add_generation_prompt=True)
+        for ex in examples
+    ]
     predictions = []
-    for ex in tqdm(examples, desc="Generating"):
-        messages = ex["messages"][:-1]
-        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        pred = generate(model, tokenizer, prompt, max_new_tokens=max_new_tokens)
-        predictions.append(pred)
+    for i in tqdm(range(0, len(prompts), batch_size), desc="Generating"):
+        predictions.extend(generate_batch(
+            model, tokenizer, prompts[i:i + batch_size],
+            max_new_tokens=max_new_tokens, do_sample=False, max_length=max_prompt_length,
+        ))
     return predictions
 
 
@@ -43,13 +50,14 @@ def main():
     test_examples = load_jsonl(cfg["eval"]["test_path"])
     max_new_tokens = cfg["model"]["max_new_tokens"]
     tolerance = cfg["eval"]["numeric_tolerance"]
+    batch_size = cfg["eval"]["batch_size"]
 
     results = {}
 
     # Base model
     print("\n=== Evaluating base model ===")
     model, tokenizer = load_base_only(cfg["model"]["base"], cfg)
-    base_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens)
+    base_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens, batch_size)
     base_perplexity = compute_perplexity(model, tokenizer, test_examples[:200])
     results["base_accuracy"] = compute_accuracy(test_examples, base_preds, tolerance)
     results["base_perplexity"] = base_perplexity
@@ -59,7 +67,7 @@ def main():
     # SFT model
     print("\n=== Evaluating SFT model ===")
     model, tokenizer = load_model_for_inference(cfg["model"]["base"], cfg["model"]["sft_checkpoint"], cfg)
-    sft_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens)
+    sft_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens, batch_size)
     sft_perplexity = compute_perplexity(model, tokenizer, test_examples[:200])
     results["sft_accuracy"] = compute_accuracy(test_examples, sft_preds, tolerance)
     results["sft_perplexity"] = sft_perplexity
@@ -69,7 +77,7 @@ def main():
     # DPO model
     print("\n=== Evaluating DPO model ===")
     model, tokenizer = load_model_for_inference(cfg["model"]["base"], cfg["model"]["dpo_checkpoint"], cfg)
-    dpo_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens)
+    dpo_preds = run_predictions(model, tokenizer, test_examples, max_new_tokens, batch_size)
     dpo_perplexity = compute_perplexity(model, tokenizer, test_examples[:200])
     results["dpo_accuracy"] = compute_accuracy(test_examples, dpo_preds, tolerance)
     results["dpo_perplexity"] = dpo_perplexity

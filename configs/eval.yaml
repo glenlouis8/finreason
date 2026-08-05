@@ -14,5 +14,5 @@ eval:
   test_path: data/sft_test.jsonl
   results_dir: results/
   numeric_tolerance: 0.01
-  batch_size: 8
+  batch_size: 16   # A100 40GB, 4-bit 7B, 2048-token prompts. Drop to 8 on smaller cards.
   seed: 42

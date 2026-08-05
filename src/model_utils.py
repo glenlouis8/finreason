@@ -94,9 +94,13 @@ def generate_batch(
     do_sample: bool = False,
     temperature: float = 0.8,
     top_p: float = 0.95,
+    max_length: int = 1024,
 ) -> list[str]:
+    # max_length caps the PROMPT. 1024 is fine for DPO mining (speed over fidelity),
+    # but eval must pass 2048 to match SFT's max_seq_length — truncating a FinQA
+    # context drops the table rows the answer depends on.
     tokenizer.padding_side = "left"
-    inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True, max_length=1024).to(model.device)
+    inputs = tokenizer(prompts, return_tensors="pt", padding=True, truncation=True, max_length=max_length).to(model.device)
     input_lengths = inputs["input_ids"].shape[1]
     gen_kwargs = dict(max_new_tokens=max_new_tokens, do_sample=do_sample, pad_token_id=tokenizer.eos_token_id)
     if do_sample:
