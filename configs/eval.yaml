@@ -11,7 +11,7 @@ quantization:
   bnb_4bit_use_double_quant: true
 
 eval:
-  test_path: data/sft_eval.jsonl
+  test_path: data/sft_test.jsonl
   results_dir: results/
   numeric_tolerance: 0.01
   batch_size: 8

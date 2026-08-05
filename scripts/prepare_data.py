@@ -35,16 +35,13 @@ def parse_args():
 
 def prepare_sft(cfg: dict):
     print("Loading and formatting FinQA...")
-    train, eval_, test = load_finqa_sft(
-        eval_split_ratio=0.05,
-        seed=cfg["training"]["seed"],
-    )
+    train, dev, test = load_finqa_sft(seed=cfg["training"]["seed"])
 
     save_jsonl(train, "data/sft_train.jsonl")
-    save_jsonl(eval_, "data/sft_eval.jsonl")
+    save_jsonl(dev, "data/sft_dev.jsonl")
     save_jsonl(test, "data/sft_test.jsonl")
 
-    print(f"SFT data saved — train: {len(train)}, eval: {len(eval_)}, test: {len(test)}")
+    print(f"SFT data saved — train: {len(train)}, dev: {len(dev)}, test: {len(test)}")
 
 
 def prepare_dpo_synthetic(cfg: dict, max_examples: int = 2000):

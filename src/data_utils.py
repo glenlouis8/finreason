@@ -51,6 +51,7 @@ def format_sft_example(example: dict) -> dict:
 
 FINQA_URLS = {
     "train": "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/train.json",
+    "dev":   "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/dev.json",
     "test":  "https://raw.githubusercontent.com/czyssrs/FinQA/main/dataset/test.json",
 }
 
@@ -62,20 +63,23 @@ def _download_finqa(split: str) -> list[dict]:
         return json.loads(r.read().decode())
 
 
-def load_finqa_sft(eval_split_ratio: float = 0.05, seed: int = 42):
+def load_finqa_sft(seed: int = 42):
+    """FinQA's own 3-way split: train 6251 / dev 883 / test 1147.
+
+    Train is shuffled (seed-locked) so batch order is stable across runs; dev and
+    test keep their published order. No homemade holdout — dev is the official
+    validation file, so test numbers stay comparable to the FinQA paper.
+    """
     import random
 
-    train_raw = _download_finqa("train")
-    test_raw = _download_finqa("test")
-
-    train_formatted = [format_sft_example(ex) for ex in train_raw]
-    test_formatted = [format_sft_example(ex) for ex in test_raw]
+    train_formatted = [format_sft_example(ex) for ex in _download_finqa("train")]
+    dev_formatted = [format_sft_example(ex) for ex in _download_finqa("dev")]
+    test_formatted = [format_sft_example(ex) for ex in _download_finqa("test")]
 
     random.seed(seed)
     random.shuffle(train_formatted)
-    split = int(len(train_formatted) * (1 - eval_split_ratio))
 
-    return train_formatted[:split], train_formatted[split:], test_formatted
+    return train_formatted, dev_formatted, test_formatted
 
 
 def extract_numeric_answer(text: str) -> float | None:

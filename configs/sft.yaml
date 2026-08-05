@@ -36,11 +36,17 @@ training:
   bf16: true
   logging_steps: 10
   save_strategy: epoch
+  eval_strategy: epoch
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  save_total_limit: 2
+  per_device_eval_batch_size: 4
   seed: 42
 
 data:
   train_path: data/sft_train.jsonl
-  eval_path: data/sft_eval.jsonl
+  eval_path: data/sft_dev.jsonl
 
 wandb:
   project: finreason

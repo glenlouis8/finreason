@@ -19,14 +19,27 @@ Portfolio project targeting ML Engineer roles.
 - **Accuracy gain:** 0.3% → 58.5% (+58.2pp, base → DPO)
 - **DPO win rate vs SFT:** 0.625 (DPO preferred on 62.5% of contested pairs)
 
-Eval on FinQA test set (313 examples, seed=42). Numeric tolerance ±1%.
+> **Stale — rerun pending.** These numbers came from a run that held out 5% of FinQA train
+> (313 examples) as its eval set; the official `dev`/`test` files were never used. The pipeline
+> now trains on all 6,251 train rows, validates on dev (883), and reports on test (1,147).
+> Table gets replaced once SFT is retrained and `evaluate.py` reruns on test.
+
+Numeric tolerance ±1%, seed=42.
 
 ---
 
 ## Dataset
 
 [FinQA](https://github.com/czyssrs/FinQA) — multi-step numerical reasoning over SEC earnings reports.
-~8k train / ~1k test. Questions require arithmetic over financial tables (revenue growth, margins, YoY changes).
+Questions require arithmetic over financial tables (revenue growth, margins, YoY changes).
+
+Official 3-way split, used as published:
+
+| Split | N | Use |
+|-------|---|-----|
+| train | 6,251 | SFT + DPO pair mining |
+| dev | 883 | per-epoch validation, best-checkpoint selection |
+| test | 1,147 | reported metrics only |
 
 ---
 
@@ -49,7 +62,7 @@ push_to_hub.py    → publish to HuggingFace with model card
 - **Training:** TRL SFTTrainer + DPOTrainer, paged_adamw_8bit, cosine LR
 - **Tracking:** Weights & Biases
 - **Compute:** Google Colab Pro A100 (40GB)
-- **Serving:** HuggingFace Hub + production K8s layer (see [`serving/`](serving/README.md))
+- **Serving:** HuggingFace Hub
 
 ---
 
@@ -61,7 +74,6 @@ src/        # data_utils, model_utils, eval_utils
 scripts/    # one entry point per pipeline stage
 results/    # versioned eval JSON
 notebooks/  # colab_sft.ipynb, colab_dpo.ipynb
-serving/    # production serving: vLLM, AWQ, Docker, K8s, HPA, load test, Grafana
 ```
 
 ---
@@ -84,20 +96,6 @@ python scripts/train_dpo.py --config configs/dpo.yaml
 # Eval
 python scripts/evaluate.py --config configs/eval.yaml
 ```
-
----
-
-## Serving (Kubernetes)
-
-Production serving layer in [`serving/`](serving/README.md): vLLM inference,
-AWQ 4-bit quantization, Docker, Kubernetes (Deployment + Service + HPA
-autoscaling), Locust load testing, Prometheus/Grafana.
-
-Proof (`serving/docs/screenshots/`): a real LLM running on Kubernetes —
-pod + Service + OpenAI-compatible API answering a FinReason question through
-the cluster. Load test: 326 req/s, p99 14ms, 0% errors @ 100 users.
-7B FinReason model AWQ-quantized and published:
-[glen-louis/finreason-qwen2.5-7b-awq](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-awq).
 
 ---
 
