@@ -45,7 +45,55 @@ def parse_args():
     p.add_argument("--duration", type=float, default=120.0, help="total seconds")
     p.add_argument("--once", action="store_true", help="single snapshot, then exit")
     p.add_argument("--out", default="results/vllm_metrics.json")
+    # Self-generated load. Coordinating "start the load test in another terminal"
+    # is where this kept going wrong — a few seconds of typing lag and the whole
+    # capture window lands on an idle server, which reads as all-zero gauges.
+    # With --load, the traffic and the sampling start together by construction.
+    p.add_argument("--load", type=int, default=0,
+                   help="fire N concurrent requests while sampling")
+    p.add_argument("--load-tokens", type=int, default=256)
     return p.parse_args()
+
+
+def start_load(base_url: str, concurrency: int, max_tokens: int):
+    """Background traffic so the gauges have something to report."""
+    import threading
+    import urllib.error
+
+    model_url = base_url.replace("/metrics", "/v1/chat/completions")
+    payload = json.dumps({
+        "model": MODEL_PLACEHOLDER,
+        "messages": [
+            {"role": "system", "content": "You are a financial analyst. "
+                                          "Reason step-by-step and end with 'Final Answer:'."},
+            {"role": "user", "content": "A company's revenue grew from $4.2 billion "
+                                        "to $5.7 billion. What was the percentage growth?"},
+        ],
+        "temperature": 0.0,
+        "max_tokens": max_tokens,
+    }).encode()
+
+    stop = threading.Event()
+
+    def worker():
+        while not stop.is_set():
+            req = urllib.request.Request(
+                model_url, data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            try:
+                urllib.request.urlopen(req, timeout=120).read()
+            except (urllib.error.URLError, TimeoutError):
+                return
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(concurrency)]
+    for t in threads:
+        t.start()
+    print(f"[load] {concurrency} concurrent requests started")
+    return stop
+
+
+MODEL_PLACEHOLDER = "glen-louis/finreason-qwen2.5-7b-awq"
 
 
 def scrape(url: str) -> dict:
@@ -91,6 +139,12 @@ def derive(sample: dict) -> dict:
 def main():
     args = parse_args()
     samples = []
+
+    stop_load = None
+    if args.load:
+        stop_load = start_load(args.url, args.load, args.load_tokens)
+        time.sleep(2)          # let the first batch reach the scheduler
+
     deadline = time.time() + (0 if args.once else args.duration)
 
     while True:
@@ -116,6 +170,10 @@ def main():
         if args.once or time.time() >= deadline:
             break
         time.sleep(args.interval)
+
+    if stop_load is not None:
+        stop_load.set()
+        print("[load] stopping (in-flight requests finish on their own)")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
