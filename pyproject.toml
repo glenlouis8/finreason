@@ -23,3 +23,9 @@ dependencies = [
     "trl>=0.8.6",
     "wandb>=0.16.0",
 ]
+
+[tool.pytest.ini_options]
+# Repo root on sys.path so `from src...` resolves without an editable install,
+# matching how the scripts/ entry points import.
+pythonpath = ["."]
+testpaths = ["tests"]
