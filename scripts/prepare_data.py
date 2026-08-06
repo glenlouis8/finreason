@@ -18,7 +18,9 @@ from src.data_utils import (
     load_finqa_sft, save_jsonl, load_jsonl, SYSTEM_PROMPT,
     build_preference_pairs, build_synthetic_preference_pairs,
 )
-from src.model_utils import load_model_for_inference, generate_batch
+# model_utils is imported lazily inside prepare_dpo() — it pulls in peft/torch,
+# and plain data prep must stay runnable on a CPU box (or a serving box) that
+# has no training deps installed.
 
 
 def parse_args():
@@ -54,6 +56,8 @@ def prepare_dpo_synthetic(cfg: dict, max_examples: int = 2000):
 
 def prepare_dpo(cfg: dict, dpo_cfg: dict, n_runs: int, max_examples: int = 2000, batch_size: int = 8, checkpoint_every: int = 100):
     import json
+
+    from src.model_utils import load_model_for_inference, generate_batch
 
     sft_checkpoint = dpo_cfg["training"]["sft_checkpoint"]
     if not Path(sft_checkpoint).exists():
