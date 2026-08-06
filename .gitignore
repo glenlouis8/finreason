@@ -14,3 +14,7 @@ wandb/
 *.log
 data/
 CLAUDE.md
+
+# live capture output, not a versioned result
+results/vllm_metrics.json
+results/endpoint_predictions*.jsonl
