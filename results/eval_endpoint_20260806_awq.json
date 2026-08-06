@@ -1,0 +1,11 @@
+{
+  "endpoint_model": "glen-louis/finreason-qwen2.5-7b-awq",
+  "endpoint_accuracy": 0.5510026155187445,
+  "endpoint_correct": 632,
+  "endpoint_n": 1147,
+  "endpoint_elapsed_s": 97.61638641357422,
+  "endpoint_req_per_s": 11.750076417912782,
+  "numeric_tolerance": 0.01,
+  "repetition_penalty": 1.05,
+  "note": "server default decoding (generation_config.json repetition_penalty=1.05)"
+}

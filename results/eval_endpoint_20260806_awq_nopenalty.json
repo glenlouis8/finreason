@@ -1,0 +1,11 @@
+{
+  "endpoint_model": "glen-louis/finreason-qwen2.5-7b-awq",
+  "endpoint_accuracy": 0.5501307759372276,
+  "endpoint_correct": 631,
+  "endpoint_n": 1147,
+  "endpoint_elapsed_s": 53.282692193984985,
+  "endpoint_req_per_s": 21.52669005207442,
+  "numeric_tolerance": 0.01,
+  "repetition_penalty": 1.0,
+  "note": "decoding matched to offline eval; repetition penalty ruled out as cause of the AWQ gap (55.10 vs 55.01, 1 example)"
+}
