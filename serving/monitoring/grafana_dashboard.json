@@ -1,0 +1,101 @@
+{
+  "uid": "finreason-vllm",
+  "title": "FinReason — vLLM Serving",
+  "tags": ["vllm", "finreason"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Requests running vs waiting",
+      "description": "Running = in the current batch. Waiting > 0 means vLLM's scheduler is queueing, i.e. saturation.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 15, "lineWidth": 2 }, "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "expr": "vllm:num_requests_running", "legendFormat": "running" },
+        { "refId": "B", "expr": "vllm:num_requests_waiting", "legendFormat": "waiting" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Generation throughput (tokens/sec)",
+      "description": "Output tokens produced per second across all concurrent requests.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "custom": { "fillOpacity": 15, "lineWidth": 2 }, "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "expr": "rate(vllm:generation_tokens_total[1m])", "legendFormat": "output tok/s" },
+        { "refId": "B", "expr": "rate(vllm:prompt_tokens_total[1m])", "legendFormat": "prompt tok/s" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Time to first token (avg)",
+      "description": "How long a user waits before seeing anything. Rises when the batch is full.",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "fillOpacity": 10, "lineWidth": 2 }, "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(vllm:time_to_first_token_seconds_sum[1m]) / rate(vllm:time_to_first_token_seconds_count[1m])",
+          "legendFormat": "TTFT"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "End-to-end request latency (avg)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "fillOpacity": 10, "lineWidth": 2 }, "min": 0 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(vllm:e2e_request_latency_seconds_sum[1m]) / rate(vllm:e2e_request_latency_seconds_count[1m])",
+          "legendFormat": "e2e latency"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "KV cache utilisation",
+      "description": "Fraction of the 37.2 GiB KV cache in use. Approaching 1.0 is what forces the scheduler to queue.",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "custom": { "fillOpacity": 20, "lineWidth": 2 }, "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "targets": [
+        { "refId": "A", "expr": "vllm:gpu_cache_usage_perc", "legendFormat": "KV cache" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Requests completed",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
+      "targets": [
+        { "refId": "A", "expr": "sum(vllm:request_success_total)", "legendFormat": "successful requests" }
+      ]
+    }
+  ]
+}
