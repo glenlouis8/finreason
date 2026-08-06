@@ -38,6 +38,13 @@ def parse_args():
     p.add_argument("--concurrency", type=int, default=50)
     p.add_argument("--max-tokens", type=int, default=512)
     p.add_argument("--tolerance", type=float, default=0.01)
+    # Qwen ships generation_config.json with repetition_penalty=1.05 (a chat
+    # default). vLLM honours it; scripts/evaluate.py never did. Penalising
+    # repeated tokens is wrong here — correct FinQA answers restate numbers from
+    # the table ("... = 94\nFinal Answer: 94"). Default 1.0 = off, matching the
+    # offline eval so the two numbers are comparable. Pass 1.05 to reproduce the
+    # server default.
+    p.add_argument("--repetition-penalty", type=float, default=1.0)
     p.add_argument("--limit", type=int, default=None, help="only first N examples")
     p.add_argument("--results-dir", default="results/")
     p.add_argument("--save-predictions", default="results/endpoint_predictions.jsonl")
@@ -52,7 +59,8 @@ def main():
     if args.limit:
         examples = examples[: args.limit]
     print(f"Evaluating {args.model} on {len(examples)} examples "
-          f"(concurrency={args.concurrency})")
+          f"(concurrency={args.concurrency}, "
+          f"repetition_penalty={args.repetition_penalty})")
 
     def run_one(ex: dict) -> str:
         # temperature=0 to match how evaluate.py generated (greedy). The model's
@@ -63,6 +71,9 @@ def main():
             messages=ex["messages"][:-1],
             temperature=0.0,
             max_tokens=args.max_tokens,
+            # repetition_penalty isn't in the OpenAI schema — vLLM reads it from
+            # extra_body. Sent explicitly so generation_config.json can't override.
+            extra_body={"repetition_penalty": args.repetition_penalty},
         )
         return resp.choices[0].message.content or ""
 
@@ -104,6 +115,7 @@ def main():
         "endpoint_elapsed_s": elapsed,
         "endpoint_req_per_s": len(examples) / elapsed,
         "numeric_tolerance": args.tolerance,
+        "repetition_penalty": args.repetition_penalty,
     }, args.results_dir)
 
 
