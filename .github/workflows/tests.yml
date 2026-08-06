@@ -19,14 +19,12 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install 3.12
-
-      # Only what the CPU-side tests import. Installing the full training stack
-      # (torch, peft, trl, bitsandbytes) would add ~5 minutes and a GB of wheels
-      # for zero extra coverage — nothing under test loads a model.
-      - name: Install test deps
-        run: uv pip install --system pytest pyyaml scipy
+      # A venv, not --system: the runner's Python is externally managed (PEP 668)
+      # and refuses system-wide installs.
+      - name: Create venv and install test deps
+        run: |
+          uv venv --python 3.12
+          uv pip install pytest pyyaml scipy
 
       # Best-effort: downloads FinQA so the data-contract tests actually run.
       # They skip cleanly when data/ is absent, so a GitHub outage or a moved
@@ -34,7 +32,7 @@ jobs:
       - name: Build FinQA splits
         continue-on-error: true
         run: |
-          python -c "
+          uv run --no-project python -c "
           from src.data_utils import load_finqa_sft, save_jsonl
           tr, dv, te = load_finqa_sft()
           save_jsonl(tr, 'data/sft_train.jsonl')
@@ -44,10 +42,10 @@ jobs:
           "
 
       - name: Run tests
-        run: pytest -v
+        run: uv run --no-project pytest -v
 
       # Fails the build if the newest committed results/eval_*.json drops below
       # the accuracy floors, or if base accuracy collapses back toward zero
       # (the signature of a regressed answer parser).
       - name: Metric regression gate
-        run: pytest tests/test_metrics.py -v -k "committed or artifact"
+        run: uv run --no-project pytest tests/test_metrics.py -v -k "committed or artifact"

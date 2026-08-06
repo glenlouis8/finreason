@@ -3,9 +3,9 @@ import math
 from pathlib import Path
 from datetime import datetime
 
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
+# torch/transformers are imported lazily inside compute_perplexity — it's the only
+# function here that needs them. Keeping them out of module scope lets the scoring
+# helpers (and their tests) run on a machine with no training stack installed.
 from src.data_utils import extract_numeric_answer
 
 
@@ -30,11 +30,13 @@ def compute_accuracy(examples: list[dict], predictions: list[str], tolerance: fl
 
 
 def compute_perplexity(
-    model: AutoModelForCausalLM,
-    tokenizer: AutoTokenizer,
+    model,                 # AutoModelForCausalLM
+    tokenizer,             # AutoTokenizer
     examples: list[dict],
     max_length: int = 2048,
 ) -> float:
+    import torch
+
     model.eval()
     total_loss = 0.0
     total_tokens = 0
