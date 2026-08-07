@@ -25,7 +25,10 @@ from pathlib import Path
 KEEP_PREFIXES = (
     "vllm:num_requests_running",
     "vllm:num_requests_waiting",          # >0 means requests are queueing
-    "vllm:gpu_cache_usage_perc",          # KV cache pressure
+    "vllm:kv_cache_usage_perc",           # KV cache pressure (was gpu_cache_usage_perc pre-0.26)
+    "vllm:gpu_cache_usage_perc",          # older vLLM name, kept so this works on both
+    "vllm:prefix_cache_queries_total",
+    "vllm:prefix_cache_hits_total",
     "vllm:prompt_tokens_total",
     "vllm:generation_tokens_total",
     "vllm:request_success_total",
@@ -131,6 +134,13 @@ def derive(sample: dict) -> dict:
     ratio("vllm:e2e_request_latency_seconds_sum",
           "vllm:e2e_request_latency_seconds_count", "avg_e2e_latency_s")
 
+    q = next((v for k, v in sample.items()
+              if k.startswith("vllm:prefix_cache_queries_total")), None)
+    h = next((v for k, v in sample.items()
+              if k.startswith("vllm:prefix_cache_hits_total")), None)
+    if q:
+        out["prefix_cache_hit_rate"] = round(h / q, 4)
+
     if out.get("avg_time_per_output_token_s"):
         out["tokens_per_s_per_request"] = round(1 / out["avg_time_per_output_token_s"], 2)
     return out
@@ -163,7 +173,8 @@ def main():
             waiting = next((v for k, v in raw.items()
                             if k.startswith("vllm:num_requests_waiting")), 0)
             cache = next((v for k, v in raw.items()
-                          if k.startswith("vllm:gpu_cache_usage_perc")), 0)
+                          if k.startswith(("vllm:kv_cache_usage_perc",
+                                           "vllm:gpu_cache_usage_perc"))), 0)
             print(f"[{now}] running={running:.0f} waiting={waiting:.0f} "
                   f"kv_cache={cache:.1%} {snap['derived']}")
 
