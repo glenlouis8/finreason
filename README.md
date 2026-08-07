@@ -79,6 +79,32 @@ concurrency rather than queueing it. Server reported 37.2 GiB of KV cache (696k 
 An earlier version of this README claimed 326 req/s at p99 14 ms. That load test hit an nginx
 placeholder, not the model. The numbers above are the model actually generating.
 
+### Observability
+
+vLLM exposes Prometheus metrics; `serving/monitoring/setup_monitoring.sh` stands up Prometheus +
+Grafana against a running server in one command, with the data source and dashboard provisioned
+from files ([`grafana_dashboard.json`](serving/monitoring/grafana_dashboard.json)).
+
+![Grafana dashboard](serving/docs/screenshots/grafana-vllm-dashboard.png)
+
+Measured at 40 concurrent requests on an A40:
+
+| Metric | Value |
+|---|---|
+| Generation throughput | ~3,000 tok/s |
+| Time to first token | ~60 ms |
+| End-to-end latency | ~700 ms |
+| Requests waiting | 0 (scheduler never queued) |
+| KV cache utilisation | 0.3% of 645k tokens |
+| Prefix cache hit rate | 87.3% |
+
+Two caveats on those last two: the load generator repeats one short prompt, so KV usage is far
+below what full SEC-table prompts would demand, and the prefix hit rate is flattered by that
+repetition. Real FinQA traffic would push cache usage up and hit rate down.
+
+`serving/monitoring/capture_metrics.py --load N` scrapes the same metrics to JSON without the
+Grafana stack — useful when the box is temporary, since the JSON outlives it.
+
 ---
 
 ## Dataset
