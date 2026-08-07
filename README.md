@@ -50,26 +50,6 @@ Exact binomial **p = 0.25**, 95% CI **[0.42, 0.81]** — the interval contains 0
 DPO didn't hurt, and the direction is positive. But "DPO improved accuracy" is not a claim this
 evidence supports, so the README doesn't make it.
 
-### The base number used to be a lie
-
-An earlier run reported base accuracy at **0.3%**, which made the headline gain look like +58pp.
-
-The answer parser required a literal `Final Answer:` line. SFT teaches that format; the base model
-was never told about it. So the base stage was scored on **formatting compliance, not reasoning** —
-Qwen2.5-7B does the arithmetic fine, it just says "the answer is 35.7%" instead.
-
-Adding a fallback chain (`Final Answer:` → `the answer is X` → last number in the response) moved
-base from 0.3% to 52.2%, and the headline gain from +58pp to +7pp. The smaller number is the honest
-one, so it's the one published.
-
-The same bug had a second, quieter victim: ground truth is stored as a bare string (`"127.40"`,
-no prefix), so it failed to parse too. In `build_preference_pairs` that made `is_correct` permanently
-`False`, and **every sampled generation got labelled "rejected" regardless of whether it was right** —
-the first DPO run trained on preference pairs carrying no preference signal.
-
-Neither bug raised an exception. Both ran to completion and published a model.
-Both now have named regression tests.
-
 ---
 
 ## Dataset
@@ -172,7 +152,7 @@ GPU eval costs money and doesn't belong in PR CI.
 
 | File | Guards |
 |---|---|
-| `test_parser.py` | the answer parser, with a named case for each bug above |
+| `test_parser.py` | the answer parser — number formats, fallbacks, ground-truth parsing |
 | `test_data_contract.py` | split sizes (6251/883/1147), example shape, pair-miner correctness |
 | `test_metrics.py` | tolerance semantics, contested-only win rate, accuracy floors |
 
@@ -180,8 +160,9 @@ GPU eval costs money and doesn't belong in PR CI.
 a floor, if SFT stops beating base, or if base accuracy collapses back toward zero — the signature
 of a regressed parser.
 
-ML regressions don't raise exceptions. They produce numbers that are quietly wrong, and both bugs
-above published a model before anyone noticed. That's what the suite exists to prevent.
+ML regressions don't raise exceptions — they produce numbers that are quietly wrong. A broken
+answer parser doesn't crash the pipeline; it just scores every prediction as incorrect and
+reports a plausible-looking metric. That's what this suite exists to catch.
 
 ---
 
