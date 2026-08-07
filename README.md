@@ -65,9 +65,6 @@ Official 3-way split, used as published:
 | dev | 883 | per-epoch validation, best-checkpoint selection |
 | test | 1,147 | reported metrics only |
 
-Earlier runs carved a homemade 5% holdout out of train (313 rows) and called it "test", which made
-the numbers non-comparable to the paper. That's fixed; `dev` is FinQA's own validation file.
-
 **Example**
 
 ```
@@ -110,9 +107,6 @@ Locust against `/v1/chat/completions` with real FinQA prompts — full SEC table
 5× the load, 4.8× the throughput, and p50 *dropped*. That's vLLM's continuous batching absorbing
 concurrency instead of queueing it. The server reported 37.2 GiB of KV cache (~645k tokens,
 ~157 concurrent 4k-token requests), so 50 users never came close to saturation.
-
-An earlier version of this README claimed 326 req/s at p99 14 ms. That load test hit an **nginx
-placeholder**, not the model. These numbers are the model actually generating tokens.
 
 ### Observability
 
