@@ -17,26 +17,43 @@ from huggingface_hub import HfApi
 from peft import PeftModel
 from transformers import AutoTokenizer
 
-from src.model_utils import load_base_only, get_bnb_config
+from src.model_utils import load_base_only
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/eval.yaml")
     parser.add_argument("--sft_config", default="configs/sft.yaml")
+    parser.add_argument("--dpo_config", default="configs/dpo.yaml")
     parser.add_argument("--repo", required=True, help="HuggingFace repo id, e.g. username/finreason-dpo")
     parser.add_argument("--results", default=None, help="Path to eval results JSON")
     return parser.parse_args()
 
 
 def find_latest_results(results_dir: str) -> dict:
-    results_path = sorted(Path(results_dir).glob("eval_*.json"))
-    if not results_path:
-        raise FileNotFoundError(f"No results found in {results_dir}. Run evaluate.py first.")
-    return json.loads(results_path[-1].read_text())
+    """Newest 3-stage eval file.
+
+    Filters on content, not filename: `eval_*.json` also matches the endpoint-eval
+    outputs (`eval_endpoint_*.json`), which sort last alphabetically and carry only
+    `endpoint_*` keys — picking one silently produced a model card of 0.0% figures.
+    """
+    candidates = [
+        p for p in sorted(Path(results_dir).glob("eval_*.json"))
+        if "base_accuracy" in json.loads(p.read_text())
+    ]
+    if not candidates:
+        raise FileNotFoundError(
+            f"No 3-stage eval results in {results_dir}. Run evaluate.py first."
+        )
+    return json.loads(candidates[-1].read_text())
 
 
-def build_model_card(repo: str, results: dict, base_model: str) -> str:
+def build_model_card(repo: str, results: dict, base_model: str,
+                     sft_cfg: dict, dpo_cfg: dict) -> str:
+    # Hyperparameters are read from the configs, not restated here — hardcoding
+    # them drifted (the card claimed lr=5e-5 / 1 epoch while dpo.yaml said 1e-5 / 2).
+    s, d = sft_cfg["training"], dpo_cfg["training"]
+    q = sft_cfg["qlora"]
     return f"""---
 language: en
 license: apache-2.0
@@ -48,7 +65,7 @@ tags:
   - dpo
   - finqa
 datasets:
-  - dreamerdeo/finqa
+  - czyssrs/FinQA
 ---
 
 # FinReason — {repo.split('/')[-1]}
@@ -64,7 +81,7 @@ SFT + DPO alignment pipeline on top of `{base_model}`.
 | SFT   | {results.get('sft_accuracy', 0):.1%} | {results.get('sft_perplexity', 0):.1f} |
 | DPO   | {results.get('dpo_accuracy', 0):.1%} | {results.get('dpo_perplexity', 0):.1f} |
 
-**DPO win rate vs SFT:** {results.get('dpo_win_rate', 0):.1%}
+**DPO win rate vs SFT:** {results.get('dpo_win_rate', 0):.1%} (contested pairs only; the sample is small, so treat the DPO delta as directional rather than significant)
 
 ## Usage
 
@@ -88,9 +105,9 @@ print(tokenizer.decode(output[0], skip_special_tokens=True))
 
 ## Training
 
-- **Dataset:** FinQA (~7.6k train, ~1k test)
-- **SFT:** QLoRA NF4 4-bit, r=16 alpha=32, 3 epochs, lr=2e-4
-- **DPO:** beta=0.1, 1 epoch, lr=5e-5
+- **Dataset:** FinQA official split — 6,251 train / 883 dev / 1,147 test
+- **SFT:** QLoRA NF4 4-bit, r={q["r"]} alpha={q["lora_alpha"]}, {s["num_train_epochs"]} epochs, lr={s["learning_rate"]}
+- **DPO:** beta={d["beta"]}, {d["num_train_epochs"]} epochs, lr={d["learning_rate"]}
 - **Preference pairs:** mined from SFT model outputs (correct vs wrong chain-of-thought)
 - **Infrastructure:** Google Colab Pro A100 (40GB)
 - **Experiment tracking:** Weights & Biases
@@ -104,6 +121,8 @@ def main():
         cfg = yaml.safe_load(f)
     with open(args.sft_config) as f:
         sft_cfg = yaml.safe_load(f)
+    with open(args.dpo_config) as f:
+        dpo_cfg = yaml.safe_load(f)
 
     results_path = args.results or None
     if results_path:
@@ -114,7 +133,6 @@ def main():
     print(f"Pushing to {args.repo}...")
 
     base_model_name = sft_cfg["model"]["name"]
-    bnb_config = get_bnb_config(sft_cfg)
     base_model, _ = load_base_only(base_model_name, sft_cfg)
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 
@@ -123,7 +141,7 @@ def main():
     model.push_to_hub(args.repo)
     tokenizer.push_to_hub(args.repo)
 
-    model_card = build_model_card(args.repo, results, base_model_name)
+    model_card = build_model_card(args.repo, results, base_model_name, sft_cfg, dpo_cfg)
     api = HfApi()
     api.upload_file(
         path_or_fileobj=model_card.encode(),
