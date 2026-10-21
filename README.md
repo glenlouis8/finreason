@@ -1,27 +1,34 @@
+<div align="center">
+
 # FinReason
 
-**Post-training pipeline for financial numerical reasoning.** QLoRA SFT → DPO alignment →
-AWQ 4-bit compression → vLLM serving, measured end to end on FinQA's official test set.
+**Post-training pipeline for financial numerical reasoning: QLoRA SFT, DPO, AWQ 4-bit, vLLM serving, all measured on FinQA's official test set.**
 
-[![tests](https://github.com/glenlouis8/finreason/actions/workflows/tests.yml/badge.svg)](https://github.com/glenlouis8/finreason/actions/workflows/tests.yml)
+<a href="https://github.com/glenlouis8/finreason/actions/workflows/tests.yml"><img src="https://github.com/glenlouis8/finreason/actions/workflows/tests.yml/badge.svg" alt="tests"></a> <img src="https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white" alt="Python"> <img src="https://img.shields.io/badge/Qwen2.5-7B-6f42c1" alt="Qwen2.5-7B"> <img src="https://img.shields.io/badge/vLLM-0.26-30a9de" alt="vLLM"> <img src="https://img.shields.io/badge/license-Apache_2.0-green" alt="Apache 2.0">
+
+[Results](#results) · [Architecture](#architecture) · [Serving](#compression--serving) · [Quickstart](#quickstart) · [Limitations](#known-limitations) · [Adapter on HF](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-dpo) · [AWQ on HF](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-awq)
+
+<img src="docs/images/grafana.jpg" alt="Grafana dashboard of the served model under 40 concurrent requests" width="860">
+
+<br>
+
+<table>
+<tr>
+<td align="center" width="25%"><b>52.2 → 59.2%</b><br><sub>FinQA test accuracy, base to DPO</sub></td>
+<td align="center" width="25%"><b>15 GB → 5.2 GB</b><br><sub>weights after AWQ, 55.1% acc</sub></td>
+<td align="center" width="25%"><b>~3,000 tok/s</b><br><sub>one A40, 40 concurrent</sub></td>
+<td align="center" width="25%"><b>18.95 req/s</b><br><sub>50 users, 0 failures</sub></td>
+</tr>
+</table>
+
+</div>
+
+---
+
+## What it does
 
 Given an SEC filing excerpt and a question like *"what is the net change in net revenue during 2015?"*,
 the model reads the financial table, works through the arithmetic, and returns a number.
-
-**Models:**
-[`finreason-qwen2.5-7b-dpo`](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-dpo) (LoRA adapter) ·
-[`finreason-qwen2.5-7b-awq`](https://huggingface.co/glen-louis/finreason-qwen2.5-7b-awq) (merged, AWQ 4-bit, vLLM-ready)
-
-```
-┌──────────┐   ┌─────┐   ┌─────┐   ┌──────────┐   ┌───────┐
-│  FinQA   │──▶│ SFT │──▶│ DPO │──▶│ AWQ 4-bit│──▶│ vLLM  │
-│ 6.2k ex  │   │QLoRA│   │ β0.1│   │  5.2 GB  │   │ serve │
-└──────────┘   └─────┘   └─────┘   └──────────┘   └───────┘
-                  │         │            │            │
-               ppl 2.87  59.2% acc   55.1% acc    19 req/s
-```
-
----
 
 ## Results
 
@@ -39,6 +46,8 @@ execution accuracy on this split.
 - Perplexity 6.60 → 2.87 (base → SFT)
 - Accuracy +5.8pp from SFT, +1.2pp from DPO
 - DPO win rate 0.630 on contested examples — **but see the caveat below**
+
+<div align="center"><img src="docs/images/results.jpg" alt="Accuracy by stage: base 52.2, SFT 58.0, DPO 59.2, AWQ 55.1, FinQANet 61.24" width="760"></div>
 
 Raw JSON: [`results/eval_20260805_210727.json`](results/eval_20260805_210727.json)
 
@@ -88,7 +97,7 @@ examples rather than a generic web corpus), and served with vLLM on a rented A40
 | NF4 4-bit + adapter | 15 GB base | **59.2%** | offline eval path |
 | AWQ 4-bit merged | **5.2 GB** | 55.1% | the served model |
 
-**AWQ cost 4.1pp** (679 → 631 of 1147). Verified it wasn't a decoding artifact: vLLM inherits
+**AWQ cost 4.1pp** (679 → 632 of 1147). Verified it wasn't a decoding artifact: vLLM inherits
 `repetition_penalty=1.05` from the model's `generation_config.json`, which `evaluate.py` never
 applied. Re-ran with it disabled — 55.10% vs 55.01%, a one-example difference. The gap is
 quantization and merge, not sampling.
@@ -114,7 +123,7 @@ concurrency instead of queueing it. The server reported 37.2 GiB of KV cache (~6
 server in one command, with the data source and
 [dashboard](serving/monitoring/grafana_dashboard.json) provisioned from files.
 
-![Grafana dashboard](serving/docs/screenshots/grafana-vllm-dashboard.png)
+<div align="center"><img src="docs/images/grafana.jpg" alt="Grafana dashboard for vLLM at 40 concurrent requests" width="860"></div>
 
 At 40 concurrent requests on an A40:
 
@@ -160,7 +169,19 @@ reports a plausible-looking metric. That's what this suite exists to catch.
 
 ---
 
-## Pipeline
+## Architecture
+
+```mermaid
+flowchart LR
+    A[FinQA<br/>6,251 train] --> B[SFT<br/>QLoRA r=16]
+    B -- mined pairs --> C[DPO<br/>beta 0.1]
+    C --> D[Merge + AWQ<br/>4-bit, 5.2 GB]
+    D --> E[vLLM<br/>A40]
+    E --> F[Prometheus<br/>+ Grafana]
+```
+
+<details>
+<summary><b>Where each stage lives</b></summary>
 
 ```
 scripts/prepare_data.py              download FinQA, format for SFT, mine DPO pairs
@@ -177,6 +198,8 @@ serving/monitoring/                  Prometheus + Grafana setup, metrics capture
 ```
 
 Config-driven: hyperparameters live in `configs/*.yaml`, not in the scripts.
+
+</details>
 
 ---
 
